@@ -145,116 +145,101 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, reactive, computed } from 'vue'
 import axios from 'axios'
 
-export default {
-  name: 'PublicOrderLookupView',
-  data() {
-    return {
-      loading: false,
-      showDetails: false,
-      showSidebar: true,
-      form: {
-        invoice_number: '',
-        customer_number: '',
+const loading = ref(false)
+const showDetails = ref(false)
+const showSidebar = ref(true)
+const form = reactive({ invoice_number: '', customer_number: '' })
+const order = ref(null)
+const errorMessage = ref('')
+const successMessage = ref('')
+const userName = ref('UserName')
+
+const getUserName = computed(() => userName.value)
+const getUserInitial = computed(() => (userName.value ? userName.value.charAt(0).toUpperCase() : 'U'))
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
+
+async function lookupOrder() {
+  loading.value = true
+  order.value = null
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const response = await axios.post(
+      `${API_BASE}/api/public/orders/lookup`,
+      {
+        invoice_number: form.invoice_number,
+        customer_number: form.customer_number,
       },
-      order: null,
-      errorMessage: '',
-      successMessage: '',
-      userName: 'UserName',
-      remember: false,
-    }
-  },
-  computed: {
-    getUserName() {
-      return this.userName
-    },
-    getUserInitial() {
-      return this.userName.charAt(0).toUpperCase()
-    },
-  },
-  methods: {
-    async lookupOrder() {
-      this.loading = true
-      this.order = null
-      this.errorMessage = ''
-      this.successMessage = ''
+      {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+      }
+    )
 
-      try {
-        const response = await axios.post(
-          'http://127.0.0.1:8000/api/public/orders/lookup',
-          {
-            invoice_number: this.form.invoice_number,
-            customer_number: this.form.customer_number,
-          },
-          {
-            headers: {
-              Accept: 'application/json',
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        this.successMessage = response.data.message
-        this.order = response.data.data
-        this.showDetails = true
-      } catch (error) {
-        if (error.response) {
-          if (error.response.status === 404) {
-            this.errorMessage =
-              error.response.data.message ||
-              'No se encontró un pedido con esos datos.'
-          } else if (error.response.status === 422) {
-            const errors = error.response.data.errors
-            if (errors) {
-              this.errorMessage = Object.values(errors).flat().join(' ')
-            } else {
-              this.errorMessage = 'Error de validación.'
-            }
-          } else {
-            this.errorMessage =
-              error.response.data.message || 'Ocurrió un error al consultar el pedido.'
-          }
+    successMessage.value = response.data.message
+    order.value = response.data.data
+    showDetails.value = true
+  } catch (error) {
+    if (error.response) {
+      if (error.response.status === 404) {
+        errorMessage.value = error.response.data.message || 'No se encontró un pedido con esos datos.'
+      } else if (error.response.status === 422) {
+        const errors = error.response.data.errors
+        if (errors) {
+          errorMessage.value = Object.values(errors).flat().join(' ')
         } else {
-          this.errorMessage = 'No fue posible conectar con el servidor.'
+          errorMessage.value = 'Error de validación.'
         }
-      } finally {
-        this.loading = false
+      } else {
+        errorMessage.value = error.response.data.message || 'Ocurrió un error al consultar el pedido.'
       }
-    },
-    goBack() {
-      this.showDetails = false
-      this.order = null
-      this.form = {
-        invoice_number: '',
-        customer_number: '',
-      }
-      this.errorMessage = ''
-      this.successMessage = ''
-    },
-    toggleMenu() {
-      this.showSidebar = !this.showSidebar
-    },
-    formatDate(dateString) {
-      if (!dateString) return 'N/A'
-      const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
-      return new Date(dateString).toLocaleDateString('es-ES', options)
-    },
-    formatStatus(status) {
-      if (!status) return 'Pendiente'
+    } else {
+      errorMessage.value = 'No fue posible conectar con el servidor.'
+    }
+  } finally {
+    loading.value = false
+  }
+}
 
-      const statusMap = {
-        ORDERED: 'Ordenado',
-        IN_PROCESS: 'En proceso',
-        IN_ROUTE: 'En ruta',
-        DELIVERED: 'Entregado',
-        DELETED: 'Eliminado',
-      }
+function goBack() {
+  showDetails.value = false
+  order.value = null
+  form.invoice_number = ''
+  form.customer_number = ''
+  errorMessage.value = ''
+  successMessage.value = ''
+}
 
-      return statusMap[status] || status
-    },
-  },
+function toggleMenu() {
+  showSidebar.value = !showSidebar.value
+}
+
+function formatDate(dateString) {
+  if (!dateString) return 'N/A'
+  const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
+  return new Date(dateString).toLocaleDateString('es-ES', options)
+}
+
+function formatStatus(status) {
+  if (!status) return 'Pendiente'
+
+  const statusMap = {
+    ORDERED: 'Ordenado',
+    IN_PROCESS: 'En proceso',
+    IN_ROUTE: 'En ruta',
+    DELIVERED: 'Entregado',
+    DELETED: 'Eliminado',
+  }
+
+  return statusMap[status] || status
 }
 </script>
 
