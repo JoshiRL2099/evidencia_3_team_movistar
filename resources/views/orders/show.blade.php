@@ -2,15 +2,19 @@
 
 @section('content')
 
+    @php $uRole = strtoupper(trim(auth()->user()->role->name ?? '')); @endphp
+
     <div class="container">
         <h2>Detalle de la Orden</h2>
 
-        <p><strong>Factura:</strong> {{ $order->invoice_number }}</p>
-        <p><strong>Cliente:</strong> {{ $order->customer->display_name ?? 'N/A' }}</p>
-        <p><strong>Usuario:</strong> {{ $order->createdBy->full_name ?? 'N/A' }}</p>
-        <p><strong>Fecha:</strong> {{ $order->order_datetime }}</p>
-        <p><strong>Estado:</strong> {{ $order->status }}</p>
-        <p><strong>Notas:</strong> {{ $order->notes ?? 'Sin notas' }}</p>
+        <div class="mb-3">
+            <p><strong>Factura:</strong> {{ $order->invoice_number }}</p>
+            <p><strong>Cliente:</strong> {{ $order->customer->display_name ?? 'N/A' }}</p>
+            <p><strong>Usuario:</strong> {{ $order->createdBy->full_name ?? 'N/A' }}</p>
+            <p><strong>Fecha:</strong> {{ $order->order_datetime }}</p>
+            <p><strong>Estado:</strong> {{ $order->status }}</p>
+            <p><strong>Notas:</strong> {{ $order->notes ?? 'Sin notas' }}</p>
+        </div>
 
         <hr>
 
@@ -23,8 +27,7 @@
                     Int. {{ $order->deliveryAddress->int_number }}
                 @endif
             </p>
-            <p>{{ $order->deliveryAddress->neighborhood }}, {{ $order->deliveryAddress->city }},
-                {{ $order->deliveryAddress->state }}</p>
+            <p>{{ $order->deliveryAddress->neighborhood }}, {{ $order->deliveryAddress->city }}, {{ $order->deliveryAddress->state }}</p>
             <p>CP {{ $order->deliveryAddress->zip }}</p>
             <p><strong>Referencias:</strong> {{ $order->deliveryAddress->references ?? 'N/A' }}</p>
         @else
@@ -63,7 +66,29 @@
 
         <p><strong>Total:</strong> ${{ number_format($order->total, 2) }}</p>
 
-        <a href="{{ route('orders.index') }}" class="btn btn-secondary">Volver</a>
+        <hr>
+
+        <h4>Evidencias (Fotos)</h4>
+
+        <div id="gallery" class="mb-3">
+            <div id="gallery-items" class="d-flex gap-2 flex-wrap mb-3">
+                @forelse($order->photos as $photo)
+                    <div class="text-center">
+                        <a href="{{ $photo->url }}" target="_blank">
+                            <img src="{{ $photo->url }}" alt="evidence" class="img-thumbnail" style="width:120px;height:120px;object-fit:cover;" />
+                        </a>
+                        <div class="small text-muted">{{ ($photo->type && $photo->type !== 'UNLOADED_EVIDENCE') ? $photo->type : 'Evidencia' }}</div>
+                    </div>
+                @empty
+                    <div class="text-muted">No hay evidencias cargadas.</div>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a href="{{ route('orders.index') }}" class="btn btn-secondary">Volver</a>
+        </div>
+
     </div>
 
 @endsection

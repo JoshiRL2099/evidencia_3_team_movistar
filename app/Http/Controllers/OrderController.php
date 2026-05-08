@@ -117,11 +117,19 @@ class OrderController extends Controller
 
     public function edit(string $id)
     {
-        $order = Order::with(['deliveryAddress', 'items.product'])->findOrFail($id);
-        $customers = Customer::orderBy('display_name')->get();
-        $products = Product::where('active', true)->orderBy('name')->get(); // ✅ AGREGADO
+        // Only Admin and Sales may open the full edit form
+        $role = Auth::user()->role->name ?? '';
+        if (!in_array($role, ['ADMIN', 'SALES'])) {
+            return redirect()->route('orders.show', $id)
+                ->with('error', 'No autorizado para editar la orden.');
+        }
 
-        return view('orders.edit', compact('order', 'customers', 'products')); // ✅ AGREGADO
+        // Load photos so the edit view can show existing evidences
+        $order = Order::with(['deliveryAddress', 'items.product', 'photos'])->findOrFail($id);
+        $customers = Customer::orderBy('display_name')->get();
+        $products = Product::where('active', true)->orderBy('name')->get();
+
+        return view('orders.edit', compact('order', 'customers', 'products'));
     }
 
     public function update(Request $request, string $id)
@@ -129,42 +137,10 @@ class OrderController extends Controller
         $order = Order::with(['deliveryAddress', 'items'])->findOrFail($id);
 
         $role = Auth::user()->role->name ?? '';
-
-        if (in_array($role, ['WAREHOUSE', 'ROUTE'])) {
-            $data = $request->validate([
-                'status' => ['required', 'in:ORDERED,IN_PROCESS,IN_ROUTE,DELIVERED,DELETED'],
-            ]);
-
-            $current = $order->status;
-
-            if ($role === 'WAREHOUSE') {
-                $allowed = ['IN_PROCESS', 'IN_ROUTE'];
-                if (!in_array($data['status'], $allowed)) {
-                    return redirect()->route('orders.show', $order->order_id)
-                        ->with('error', 'Warehouse no autorizado para ese cambio de estado.');
-                }
-            }
-
-            if ($role === 'ROUTE') {
-                $allowed = ['IN_ROUTE', 'DELIVERED'];
-                if (!in_array($data['status'], $allowed)) {
-                    return redirect()->route('orders.show', $order->order_id)
-                        ->with('error', 'Route no autorizado para ese cambio de estado.');
-                }
-
-                if ($data['status'] === 'DELIVERED' && $order->photos()->count() === 0) {
-                    return redirect()->route('orders.show', $order->order_id)
-                        ->with('error', 'Se requiere evidencia (fotos) para marcar como entregado.');
-                }
-            }
-
-            $order->update([
-                'status'     => $data['status'],
-                'updated_at' => now(),
-            ]);
-
-            return redirect()->route('orders.index')
-                ->with('success', 'Estado de la orden actualizado.');
+        // Full update (invoice, items, address, etc.) only for Admin and Sales
+        if (!in_array($role, ['ADMIN', 'SALES'])) {
+            return redirect()->route('orders.show', $order->order_id)
+                ->with('error', 'No autorizado para actualizar la orden completa.');
         }
 
         $data = $request->validate([
@@ -227,6 +203,55 @@ class OrderController extends Controller
 
         return redirect()->route('orders.index')
             ->with('success', 'Orden actualizada correctamente.');
+    }
+
+    /**
+     * Update only the status of an order. This endpoint is intended for WAREHOUSE/ROUTE role flows.
+     */
+    public function updateStatus(Request $request, string $id)
+    {
+        $order = Order::with(['deliveryAddress', 'items'])->findOrFail($id);
+
+        $role = Auth::user()->role->name ?? '';
+
+        if (!in_array($role, ['ADMIN', 'WAREHOUSE', 'ROUTE'])) {
+            return redirect()->route('orders.show', $order->order_id)
+                ->with('error', 'No autorizado para cambiar el estado.');
+        }
+
+        $data = $request->validate([
+            'status' => ['required', 'in:ORDERED,IN_PROCESS,IN_ROUTE,DELIVERED,DELETED'],
+        ]);
+
+        if ($role === 'WAREHOUSE') {
+            $allowed = ['IN_PROCESS', 'IN_ROUTE'];
+            if (!in_array($data['status'], $allowed)) {
+                return redirect()->route('orders.show', $order->order_id)
+                    ->with('error', 'Warehouse no autorizado para ese cambio de estado.');
+            }
+        }
+
+        if ($role === 'ROUTE') {
+            $allowed = ['IN_ROUTE', 'DELIVERED'];
+            if (!in_array($data['status'], $allowed)) {
+                return redirect()->route('orders.show', $order->order_id)
+                    ->with('error', 'Route no autorizado para ese cambio de estado.');
+            }
+
+            if ($data['status'] === 'DELIVERED' && $order->photos()->count() === 0) {
+                return redirect()->route('orders.show', $order->order_id)
+                    ->with('error', 'Se requiere evidencia (fotos) para marcar como entregado.');
+            }
+        }
+
+        // Admin can set any allowed status
+        $order->update([
+            'status'     => $data['status'],
+            'updated_at' => now(),
+        ]);
+
+        return redirect()->route('orders.index')
+            ->with('success', 'Estado de la orden actualizado.');
     }
 
     public function destroy(string $id)

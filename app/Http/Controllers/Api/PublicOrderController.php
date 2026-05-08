@@ -95,9 +95,10 @@ class PublicOrderController extends Controller
                 })->values(),
 
                 'photos' => $order->photos->map(function ($photo) {
+                    // Use `url` as canonical field for photo location. Keep fallbacks for compatibility.
                     return [
                         'photo_id' => $photo->photo_id ?? null,
-                        'path' => $photo->photo_path ?? $photo->path ?? null,
+                        'url' => $photo->url ?? $photo->photo_path ?? $photo->path ?? null,
                         'type' => $photo->type ?? null,
                     ];
                 })->values(),
