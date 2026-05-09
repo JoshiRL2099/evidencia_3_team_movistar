@@ -200,7 +200,7 @@
 
         </fieldset>
 
-        @if(in_array($uRole, ['ADMIN', 'ROUTE']))
+        @if(in_array($uRole, ['ADMIN', 'ROUTE','SALES','WAREHOUSE']))
             <hr>
 
             <h4>Evidencias (Fotos)</h4>
